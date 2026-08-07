@@ -30,13 +30,14 @@ app.use((req, res) => {
     targetUrl = `https://${cleanPath}`;
   }
 
-  let fetchOptions = {
-    method: req.method,
-    headers: {
-      'User-Agent': req.headers['user-agent'] || 'Mozilla/5.0',
-      'Accept': req.headers['accept'] || '*/*'
-    }
-  };
+let fetchOptions = {
+  method: req.method,
+  headers: {
+    'User-Agent': req.headers['user-agent'] || 'Mozilla/5.0',
+    'Accept': req.headers['accept'] || '*/*',
+    'Accept-Encoding': 'identity'
+  }
+};
 
   if (['POST', 'PUT', 'PATCH', 'DELETE'].includes(req.method)) {
     fetchOptions.body = req; 
