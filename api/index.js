@@ -33,7 +33,8 @@ app.use((req, res) => {
       'User-Agent': req.headers['user-agent'] || 'Mozilla/5.0',
       'Accept': req.headers['accept'] || '*/*',
       'Accept-Encoding': 'identity'
-    }
+    },
+    follow: 20
   };
 
   if (['POST', 'PUT', 'PATCH', 'DELETE'].includes(req.method)) {
