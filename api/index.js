@@ -1,24 +1,22 @@
-export default async function handler(req) {
-  // CORS preflight
-  if (req.method === 'OPTIONS') {
-    return new Response(null, {
-      status: 200,
-      headers: {
-        'Access-Control-Allow-Origin': '*',
-        'Access-Control-Allow-Methods': 'GET, POST, OPTIONS, PUT, DELETE',
-        'Access-Control-Allow-Headers': '*',
-      }
-    });
-  }
+const express = require('express');
+const fetch = require('node-fetch');
+const app = express();
 
-  const url = new URL(req.url);
-  let cleanPath = url.pathname.replace(/^\//, '') + url.search;
+app.use(async (req, res) => {
+  res.header('Access-Control-Allow-Origin', '*');
+  res.header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS, PUT, DELETE');
+  res.header('Access-Control-Allow-Headers', '*');
+  
+  if (req.method === 'OPTIONS') return res.sendStatus(200);
+
+  let cleanPath = req.url.replace(/^\//, '');
 
   if (!cleanPath || cleanPath === '') {
-    return new Response('🚀 ¡Proxy Edge Activo en Vercel!', { status: 200 });
+    return res.status(200).send('🚀 ¡Proxy de Pruebas Activo en Vercel!');
   }
 
   let targetUrl = '';
+
   if (cleanPath.startsWith('ipfs/') || cleanPath.startsWith('ipns/')) {
     targetUrl = `https://ipfs.io/${cleanPath}`;
   } else if (cleanPath.startsWith('http://') || cleanPath.startsWith('https://')) {
@@ -30,33 +28,28 @@ export default async function handler(req) {
   }
 
   try {
-    const response = await fetch(targetUrl, {
+    const r = await fetch(targetUrl, {
       method: req.method,
       headers: {
-        'User-Agent': req.headers.get('user-agent') || 'Mozilla/5.0',
-        'Accept': req.headers.get('accept') || '*/*',
-        'Accept-Encoding': 'identity',
+        'User-Agent': req.headers['user-agent'] || 'Mozilla/5.0',
+        'Accept': req.headers['accept'] || '*/*',
+        'Accept-Encoding': 'identity'
       },
-      redirect: 'follow',
+      follow: 20
     });
 
-    const headers = new Headers();
-    response.headers.forEach((value, key) => {
-      if (!['content-encoding', 'transfer-encoding', 'content-security-policy'].includes(key.toLowerCase())) {
-        headers.set(key, value);
+    res.status(r.status);
+    r.headers.forEach((value, key) => {
+      if (!['content-encoding', 'transfer-encoding', 'access-control-allow-origin', 'content-security-policy'].includes(key.toLowerCase())) {
+        res.setHeader(key.toLowerCase(), value);
       }
     });
-    headers.set('Access-Control-Allow-Origin', '*');
-
-    return new Response(response.body, {
-      status: response.status,
-      headers,
-    });
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    const text = await r.text();
+    res.send(text);
   } catch (e) {
-    return new Response(`Error: ${e.message}`, { status: 500 });
+    res.status(500).send(`Error: ${e.message}`);
   }
-}
+});
 
-export const config = {
-  runtime: 'edge',
-};
+module.exports = app;
