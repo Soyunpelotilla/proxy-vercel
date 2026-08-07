@@ -32,12 +32,19 @@ app.use(async (req, res) => {
         'Accept': '*/*',
         'Accept-Encoding': 'identity'
       },
-      follow: 20
+      follow: 20,
+      redirect: 'follow'
     });
 
     const contentType = r.headers.get('content-type') || '';
-    res.setHeader('Access-Control-Allow-Origin', '*');
     res.status(r.status);
+    r.headers.forEach((value, key) => {
+      if (!['content-encoding', 'transfer-encoding', 'access-control-allow-origin', 'content-security-policy', 'location'].includes(key.toLowerCase())) {
+        res.setHeader(key, value);
+      }
+    });
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.removeHeader('location');
 
     if (contentType.includes('text/html')) {
       const html = await r.text();
@@ -46,11 +53,6 @@ app.use(async (req, res) => {
       res.setHeader('content-type', 'text/html; charset=utf-8');
       res.send(tabla || html);
     } else {
-      r.headers.forEach((value, key) => {
-        if (!['content-encoding', 'transfer-encoding', 'access-control-allow-origin', 'content-security-policy'].includes(key.toLowerCase())) {
-          res.setHeader(key, value);
-        }
-      });
       const buffer = await r.buffer();
       res.send(buffer);
     }
