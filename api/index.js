@@ -1,61 +1,62 @@
-const express = require('express');
-const fetch = require('node-fetch');
-const app = express();
+export default async function handler(req) {
+  // CORS preflight
+  if (req.method === 'OPTIONS') {
+    return new Response(null, {
+      status: 200,
+      headers: {
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Methods': 'GET, POST, OPTIONS, PUT, DELETE',
+        'Access-Control-Allow-Headers': '*',
+      }
+    });
+  }
 
-app.use((req, res) => {
-  res.header('Access-Control-Allow-Origin', '*');
-  res.header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS, PUT, DELETE');
-  res.header('Access-Control-Allow-Headers', '*');
-  
-  if (req.method === 'OPTIONS') return res.sendStatus(200);
-
-  let cleanPath = req.url.replace(/^\//, '');
+  const url = new URL(req.url);
+  let cleanPath = url.pathname.replace(/^\//, '') + url.search;
 
   if (!cleanPath || cleanPath === '') {
-    return res.status(200).send('🚀 ¡Proxy de Pruebas Activo en Vercel!');
+    return new Response('🚀 ¡Proxy Edge Activo en Vercel!', { status: 200 });
   }
 
   let targetUrl = '';
-
   if (cleanPath.startsWith('ipfs/') || cleanPath.startsWith('ipns/')) {
     targetUrl = `https://ipfs.io/${cleanPath}`;
   } else if (cleanPath.startsWith('http://') || cleanPath.startsWith('https://')) {
     targetUrl = cleanPath;
   } else if (/^https?:\/([^/])/.test(cleanPath)) {
-    targetUrl = cleanPath.replace(/^https?:\//, match => match + '/');
+    targetUrl = cleanPath.replace(/^https?:\//, m => m + '/');
   } else {
     targetUrl = `https://${cleanPath}`;
   }
 
-  let fetchOptions = {
-    method: req.method,
-    headers: {
-      'User-Agent': req.headers['user-agent'] || 'Mozilla/5.0',
-      'Accept': req.headers['accept'] || '*/*',
-      'Accept-Encoding': 'identity'
-    },
-    follow: 20
-  };
-
-  if (['POST', 'PUT', 'PATCH', 'DELETE'].includes(req.method)) {
-    fetchOptions.body = req;
-  }
-
-  fetch(targetUrl, fetchOptions)
-    .then(async r => {
-      res.status(r.status);
-      r.headers.forEach((value, key) => {
-        if (!['content-encoding', 'transfer-encoding', 'access-control-allow-origin', 'content-security-policy'].includes(key.toLowerCase())) {
-          res.setHeader(key.toLowerCase(), value);
-        }
-      });
-      res.setHeader('Access-Control-Allow-Origin', '*');
-      const buffer = await r.buffer();
-      res.send(buffer);
-    })
-    .catch(e => {
-      res.status(500).send(`Error en Vercel Proxy: ${e.message}`);
+  try {
+    const response = await fetch(targetUrl, {
+      method: req.method,
+      headers: {
+        'User-Agent': req.headers.get('user-agent') || 'Mozilla/5.0',
+        'Accept': req.headers.get('accept') || '*/*',
+        'Accept-Encoding': 'identity',
+      },
+      redirect: 'follow',
     });
-});
 
-module.exports = app;
+    const headers = new Headers();
+    response.headers.forEach((value, key) => {
+      if (!['content-encoding', 'transfer-encoding', 'content-security-policy'].includes(key.toLowerCase())) {
+        headers.set(key, value);
+      }
+    });
+    headers.set('Access-Control-Allow-Origin', '*');
+
+    return new Response(response.body, {
+      status: response.status,
+      headers,
+    });
+  } catch (e) {
+    return new Response(`Error: ${e.message}`, { status: 500 });
+  }
+}
+
+export const config = {
+  runtime: 'edge',
+};
